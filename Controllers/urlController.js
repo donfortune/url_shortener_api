@@ -1,7 +1,14 @@
 const Url = require('../Models/urlModel')
 const mongoose = require('mongoose')
 const shortid = require('shortid');
+const rateLimit = require('express-rate-limit');
 
+// Rate limiter middleware
+exports.limiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 5, // limit each IP to 5 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.'
+});
 
 exports.getAllUrls = async (req, res) => {
     try {
@@ -58,6 +65,14 @@ exports.shortUrl = async (req, res) => {
 
         if (!originalUrl) {
             return res.status(400).json({ message: 'originalUrl is required' });
+        }
+
+        const existingUrl = await Url.findOne({ originalUrl });
+        if (existingUrl) {
+            return res.status(200).json({
+                shortUrl: `${req.protocol}://${req.get('host')}/${existingUrl.shortUrl}`,
+                message: 'URL already shortened'
+            });
         }
 
         const newUrl = new Url({
